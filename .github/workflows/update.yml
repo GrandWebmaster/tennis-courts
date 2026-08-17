@@ -1,0 +1,43 @@
+name: Обновление расписания
+
+on:
+  schedule:
+    # Каждые 15 минут. GitHub запускает расписание с задержкой до нескольких минут,
+    # так что фактический возраст данных бывает и 20 минут — на странице он показан.
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'data.json'
+      - '**.md'
+
+permissions:
+  contents: write
+
+# Два обновления разом только подрались бы за data.json.
+concurrency:
+  group: schedule-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Собрать data.json
+        run: python3 build/fetch.py
+
+      - name: Закоммитить, если расписание изменилось
+        run: |
+          if git diff --quiet -- data.json; then
+            echo "свободные слоты те же, коммит не нужен"
+            exit 0
+          fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data.json
+          git commit -m "обновление расписания"
+          git push
