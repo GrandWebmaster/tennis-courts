@@ -5,7 +5,11 @@
     'use strict';
 
     var MONTHS = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+    var MONTHS_OF = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+        'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
     var WEEKDAYS = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+    var WEEKDAYS_FULL = ['воскресенье', 'понедельник', 'вторник', 'среда',
+        'четверг', 'пятница', 'суббота'];
     var DURATION_LABELS = { 30: '30 мин', 60: '1 час', 90: '1,5 часа' };
 
     var court = document.getElementById('court');
@@ -89,6 +93,34 @@
     function bookingUrl(number, entry) {
         var url = data.company.booking_base + '?st_m=1&sm_m=' + masterOf(number);
         return entry ? url + '&ss_s=' + entry.service_id : url;
+    }
+
+    // Сервис записи умеет принимать ссылкой только корт и услугу, даты в его
+    // наборе параметров нет — открывается всегда сегодняшний день. Раз подставить
+    // дату нечем, проговариваем её словами перед переходом: подсказка при
+    // наведении на телефоне не показывается, и день выбирали наугад.
+    var sheet = document.getElementById('confirm');
+
+    document.getElementById('sheet-cancel').addEventListener('click', function () {
+        sheet.close();
+    });
+
+    document.getElementById('sheet-go').addEventListener('click', function () {
+        sheet.close();
+    });
+
+    function confirmBooking(number, day, time, entry) {
+        var date = new Date(day + 'T00:00:00');
+        var spoken = date.getDate() + ' ' + MONTHS_OF[date.getMonth()];
+
+        document.getElementById('sheet-court').textContent = 'Корт №' + number + ' · хард, закрытый';
+        document.getElementById('sheet-when').textContent =
+            WEEKDAYS_FULL[date.getDay()] + ', ' + spoken + ', ' + time +
+            ' · ' + (DURATION_LABELS[selected] || selected + ' мин') + ' · ' + price(entry);
+        document.getElementById('sheet-pick').textContent = spoken;
+        document.getElementById('sheet-go').href = bookingUrl(number, entry);
+
+        sheet.showModal();
     }
 
     function renderSwitcher() {
@@ -193,6 +225,10 @@
                         link.title = 'Корт №' + number + ', ' + date.getDate() + ' ' +
                             MONTHS[date.getMonth()] + ' в ' + time + ', ' +
                             (DURATION_LABELS[selected] || selected + ' мин') + ' — ' + price(entry);
+                        link.addEventListener('click', function (event) {
+                            event.preventDefault();
+                            confirmBooking(number, day, time, entry);
+                        });
                         td.appendChild(link);
                     });
                 }
