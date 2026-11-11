@@ -148,7 +148,10 @@
             hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow',
         }) + '</b>';
 
-        if (age > 90) {
+        // Обновление приходит раз в два часа, и GitHub его ещё задерживает.
+        // Порог поднят, чтобы плашка означала «что-то сломалось», а не
+        // обычную паузу между запусками.
+        if (age > 300) {
             notice.hidden = false;
             notice.textContent = 'Расписание давно не обновлялось — данные от ' +
                 moment.toLocaleString('ru-RU', {
