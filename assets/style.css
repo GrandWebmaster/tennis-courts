@@ -16,6 +16,7 @@
     --ball: #d8f34a;
     --ball-deep: #b6cf2c;
     --clay: #c96f43;
+    --padel: #b9a0f7;
 
     --gutter: clamp(16px, 4vw, 56px);
     --display: "Unbounded", "Trebuchet MS", sans-serif;
@@ -338,13 +339,15 @@ td.past {
     transform: translateY(-1px);
 }
 
-/* Три хорошо разводимых тона: корты должны различаться боковым зрением,
-   не вчитываясь в цифру. */
+/* Хорошо разводимые тона: корты должны различаться боковым зрением,
+   не вчитываясь в букву. Падел уводим в фиолетовый — он и корт другой,
+   и компания в сервисе записи другая. */
 .chip.c2 { background: #f0a93b; }
 .chip.c3 { background: #7fd0cd; }
+.chip.cp { background: var(--padel); }
 
-.chip.c2:hover, .chip.c3:hover,
-.chip.c2:focus-visible, .chip.c3:focus-visible { background: #fff; }
+.chip.c2:hover, .chip.c3:hover, .chip.cp:hover,
+.chip.c2:focus-visible, .chip.c3:focus-visible, .chip.cp:focus-visible { background: #fff; }
 
 /* ── подтверждение перед уходом ──────────────────────────────────── */
 

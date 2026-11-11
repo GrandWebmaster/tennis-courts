@@ -69,8 +69,18 @@
         return out;
     }
 
-    function tariff(duration, dayOff, time) {
-        var windows = (data.tariffs[String(duration)] || {})[dayOff ? 'weekend' : 'weekday'] || [];
+    function courtByCode(code) {
+        for (var i = 0; i < data.courts.length; i++) {
+            if (data.courts[i].code === code) return data.courts[i];
+        }
+        return null;
+    }
+
+    // Теннис и падел — разные компании в сервисе записи, со своими прайсами.
+    // Поэтому тарифное окно ищется в таблице того источника, которому корт принадлежит.
+    function tariff(court, duration, dayOff, time) {
+        var byDuration = (data.tariffs[court.source] || {})[String(duration)] || {};
+        var windows = byDuration[dayOff ? 'weekend' : 'weekday'] || [];
         var at = minutes(time);
         for (var i = 0; i < windows.length; i++) {
             if (at >= minutes(windows[i].from) && at < minutes(windows[i].to)) return windows[i];
@@ -83,16 +93,16 @@
         return String(entry.price).replace('.', ',') + ' ₽';
     }
 
-    function masterOf(number) {
-        for (var i = 0; i < data.courts.length; i++) {
-            if (data.courts[i].n === number) return data.courts[i].master_id;
-        }
-        return null;
+    function chipClass(court) {
+        return 'chip c' + court.code.toLowerCase();
     }
 
-    function bookingUrl(number, entry) {
-        var url = data.company.booking_base + '?st_m=1&sm_m=' + masterOf(number);
-        return entry ? url + '&ss_s=' + entry.service_id : url;
+    // Ссылка умеет подставить только одну услугу: две через запятую или
+    // повтором параметра сервис записи не принимает, проверено. Когда услуг
+    // в окне две, подставляем первую и предупреждаем в подтверждении.
+    function bookingUrl(court, entry) {
+        var url = court.booking_base + '?st_m=1&sm_m=' + court.master_id;
+        return entry && entry.service_ids.length ? url + '&ss_s=' + entry.service_ids[0] : url;
     }
 
     // Сервис записи умеет принимать ссылкой только корт и услугу, даты в его
@@ -109,16 +119,28 @@
         sheet.close();
     });
 
-    function confirmBooking(number, day, time, entry) {
+    function confirmBooking(court, day, time, entry) {
         var date = new Date(day + 'T00:00:00');
         var spoken = date.getDate() + ' ' + MONTHS_OF[date.getMonth()];
 
-        document.getElementById('sheet-court').textContent = 'Корт №' + number + ' · хард, закрытый';
+        document.getElementById('sheet-court').textContent = 'Корт ' + court.title;
         document.getElementById('sheet-when').textContent =
             WEEKDAYS_FULL[date.getDay()] + ', ' + spoken + ', ' + time +
             ' · ' + (DURATION_LABELS[selected] || selected + ' мин') + ' · ' + price(entry);
         document.getElementById('sheet-pick').textContent = spoken;
-        document.getElementById('sheet-go').href = bookingUrl(number, entry);
+        document.getElementById('sheet-go').href = bookingUrl(court, entry);
+
+        // Полтора часа на падел-корте набираются двумя услугами: часом и получасом.
+        // Ссылка подставит только час, вторую придётся добрать руками.
+        var combo = document.getElementById('sheet-combo');
+        if (entry && entry.service_ids.length > 1) {
+            combo.hidden = false;
+            combo.textContent = 'Здесь ' + (DURATION_LABELS[selected] || selected + ' мин') +
+                ' собираются из двух услуг. Ссылка подставит первую — вторую добавьте ' +
+                'в списке услуг, иначе забронируется меньше времени.';
+        } else {
+            combo.hidden = true;
+        }
 
         sheet.showModal();
     }
@@ -166,7 +188,7 @@
         data.courts.forEach(function (item) {
             var wrap = document.createElement('span');
             wrap.className = 'legend-item';
-            wrap.innerHTML = '<span class="chip c' + item.n + '">' + item.n + '</span> хард №' + item.n;
+            wrap.innerHTML = '<span class="' + chipClass(item) + '">' + item.label + '</span> ' + item.title;
             legend.appendChild(wrap);
         });
     }
@@ -209,28 +231,31 @@
                 var td = document.createElement('td');
                 var off = data.day_off[day];
                 var past = day < today || (day === today && minutes(time) < nowMinutes);
-                var numbers = (grid[day] || {})[time] || [];
+                var codes = (grid[day] || {})[time] || [];
 
                 td.className = (off ? 'off ' : '') + (past ? 'past' : '');
 
-                if (past || !numbers.length) {
+                if (past || !codes.length) {
                     td.innerHTML = '<span class="gap" aria-hidden="true">·</span>';
                 } else {
-                    var entry = tariff(selected, off, time);
                     var date = new Date(day + 'T00:00:00');
-                    numbers.forEach(function (number) {
+                    codes.forEach(function (code) {
+                        var court = courtByCode(code);
+                        if (!court) return;
+
+                        var entry = tariff(court, selected, off, time);
                         var link = document.createElement('a');
-                        link.className = 'chip c' + number;
-                        link.href = bookingUrl(number, entry);
+                        link.className = chipClass(court);
+                        link.href = bookingUrl(court, entry);
                         link.target = '_blank';
                         link.rel = 'noopener';
-                        link.textContent = number;
-                        link.title = 'Корт №' + number + ', ' + date.getDate() + ' ' +
+                        link.textContent = court.label;
+                        link.title = 'Корт ' + court.title + ', ' + date.getDate() + ' ' +
                             MONTHS[date.getMonth()] + ' в ' + time + ', ' +
                             (DURATION_LABELS[selected] || selected + ' мин') + ' — ' + price(entry);
                         link.addEventListener('click', function (event) {
                             event.preventDefault();
-                            confirmBooking(number, day, time, entry);
+                            confirmBooking(court, day, time, entry);
                         });
                         td.appendChild(link);
                     });
